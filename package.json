@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A job processing service is a backend system that accepts tasks, stores them, relibly and completes them in the background while client track progress",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
