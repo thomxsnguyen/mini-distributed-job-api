@@ -1,6 +1,7 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
+import type { Request, Response } from "express";
 import { pool } from "../db/pool.js";
-import { CreateJobInput, Job } from "../models/job.js";
+import type { CreateJobInput, Job } from "../models/job.js";
 
 const router = Router();
 
