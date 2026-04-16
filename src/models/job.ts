@@ -1,4 +1,9 @@
-export type JobStatus = "pending" | "processing" | "success" | "failed" | 'dead_letter';
+export type JobStatus =
+  | "pending"
+  | "processing"
+  | "success"
+  | "failed"
+  | "dead_letter";
 
 export interface Job {
   id: number;
