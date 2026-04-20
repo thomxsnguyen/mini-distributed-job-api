@@ -25,6 +25,20 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
+// GET /jobs - get all jobs
+
+router.get("/", async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query<Job>(
+      "SELECT * FROM jobs ORDER BY created_at DESC",
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("Failed to fetch jobs:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /jobs/:id - poll status jobs
 router.get("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
