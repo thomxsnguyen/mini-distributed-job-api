@@ -31,6 +31,7 @@ router.get("/", async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
     const cursor = req.query.cursor as string | undefined;
+    const status = req.query.status as string | undefined;
 
     let result;
     if (cursor) {
@@ -40,6 +41,14 @@ router.get("/", async (req: Request, res: Response) => {
        ORDER BY created_at DESC
        LIMIT $2`,
         [cursor, limit + 1],
+      );
+    } else if (status) {
+      result = await pool.query<Job>(
+        `SELECT * FROM jobs
+        WHERE created_at < $1 AND status = $1
+        ORDER BY created_at DESC
+        LIMIT $2`,
+        [status, limit + 1],
       );
     } else {
       result = await pool.query<Job>(
