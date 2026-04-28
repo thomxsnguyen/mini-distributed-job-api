@@ -1,5 +1,5 @@
 import { pool } from "./db/pool.js";
-import type { Job } from "./models/jobs.ts";
+import type { Job } from "./models/job.js";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -14,7 +14,7 @@ async function processJob(job: Job): Promise<void> {
     throw new Error(`Simulated failure for job ${job.id}`);
   }
 
-  console.log(`Job ${job.id} compelted successfully`);
+  console.log(`Job ${job.id} completed successfully`);
 }
 
 async function pickUpJob(): Promise<void> {
@@ -25,10 +25,10 @@ async function pickUpJob(): Promise<void> {
     //grab one pending job and lock it so no other worker touches
     const result = await client.query<Job>(
       `UPDATE jobs
-      SET status = 'processing', updated_at = NOW()
+      SET status = 'PROCESSING', updated_at = NOW()
       WHERE id = (
         SELECT id FROM jobs
-        WHERE status = 'pending'
+        WHERE status = 'PENDING'
         ORDER BY created_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
@@ -45,23 +45,31 @@ async function pickUpJob(): Promise<void> {
     await client.query("COMMIT");
 
     try {
+      const job = result.rows[0];
+      if (!job) {
+        await client.query("ROLLBACK");
+        return;
+      }
+
       await processJob(job);
 
       // mark as SUCCESS
       await pool.query(
         `UPDATE jobs
         SET status = 'success', updated_at = NOW()
-        WHERE id = $id`,
+        WHERE id = $1`,
         [job.id],
       );
     } catch (err) {
+      const job = result.rows[0]!;
+
       const error = err instanceof Error ? err.message : `Unknown error`;
-      const newAttempts = job.attempt + 1;
+      const newAttempts = job.attempts + 1;
       const newStatus =
-        newAttempts >= job.max_attempt ? "DEAD_LETTER" : "FAILED";
+        newAttempts >= job.max_attempts ? "DEAD_LETTER" : "FAILED";
 
       await pool.query(
-        `UPDATEA jobs
+        `UPDATE jobs
         SET status = $1, attempts = $2, error = $3, updated_at = NOW()
         WHERE id = $4`,
         [newStatus, newAttempts, error, job.id],
