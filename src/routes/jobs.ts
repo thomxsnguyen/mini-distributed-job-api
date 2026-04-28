@@ -29,10 +29,37 @@ router.post("/", async (req: Request, res: Response) => {
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const result = await pool.query<Job>(
-      "SELECT * FROM jobs ORDER BY created_at DESC",
-    );
-    return res.json(result.rows);
+    const limit = parseInt(req.query.limit as string) || 10;
+    const cursor = req.query.cursor as string | undefined;
+
+    let result;
+    if (cursor) {
+      result = await pool.query<Job>(
+        `SELECT * FROM jobs
+       WHERE created_at < $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+        [cursor, limit + 1],
+      );
+    } else {
+      result = await pool.query<Job>(
+        `SELECT * FROM jobs
+      ORDER BY created_at DESC
+      LIMIT $1`,
+        [limit + 1],
+      );
+    }
+
+    const hasMore = result.rows.length > limit;
+    const jobs = hasMore ? result.rows.slice(0, limit) : result.rows;
+    const nextCursor = hasMore ? jobs[jobs.length - 1]?.created_at : null;
+
+    return res.json({
+      jobs,
+      hasMore,
+      nextCursor,
+      count: jobs.length,
+    });
   } catch (err) {
     console.error("Failed to fetch jobs:", err);
     return res.status(500).json({ error: "Internal server error" });
