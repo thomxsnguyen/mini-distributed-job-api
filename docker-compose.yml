@@ -17,7 +17,18 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries 5
+  
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgreSQL://
 volumes:
   postgres_data:
   redis_data:
