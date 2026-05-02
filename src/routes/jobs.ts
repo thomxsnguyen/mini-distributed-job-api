@@ -28,91 +28,50 @@ router.post("/", async (req: Request, res: Response) => {
 // GET /jobs - get all jobs
 
 router.get("/", async (req: Request, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 10;
-    const cursor = req.query.cursor as string | undefined;
-    const status = req.query.status as string | undefined;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const cursor = req.query.cursor as string | undefined;
+  const status = req.query.status as string | undefined;
 
+  const conditions: string[] = [];
+  const params: unknown[] = [];
 
-    const conditions: string[] = [];
-    const params: unknown[] = [];
+  if (cursor) {
+    params.push(cursor);
+    conditions.push(`created_at < $${params.length}`);
+  }
 
-    if (cursor) {
-      params.push(cursor);
-      conditions.push(`created_at < $${params.length}`)
-    }
+  if (status) {
+    params.push(status);
+    conditions.push(`status = $${params.length}`);
+  }
 
-    if (status) {
-      params.push(status);
-      conditions.push(`status = $${params.length}`)
-    }
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(`AND`)}` : "";
 
-   const whereClause = conditions.length > 0
-    ? `WHERE ${conditions.join(`AND`)}`
-    : '';
+  params.push(limit + 1);
 
-    params.push(limit + 1)
-
-    try {
-      const result = await pool.query<Job>(`SELECT * FROM jobs ${whereClause} 
+  try {
+    const result = await pool.query<Job>(
+      `SELECT * FROM jobs ${whereClause} 
                                             ORDER BY created_at DESC 
                                             LIMIT $${params.length}`,
-                                          params)
+      params,
+    );
 
-      const hasMore = result.rows.length > limit;
-      const jobs = hasMore ? result.rows.slice(0, limit) : result.rows;
-      const nextCursor = hasMore ? jobs[jobs.length - 1]?.created_at : null;
+    const hasMore = result.rows.length > limit;
+    const jobs = hasMore ? result.rows.slice(0, limit) : result.rows;
+    const nextCursor = hasMore ? jobs[jobs.length - 1]?.created_at : null;
 
-      return res.json({
-        jobs, hasMore, nextCursor, count: jobs.length
-      });
-    } catch (err) {
-      console.error('Failed to fetch jobs:', err)
-      return res.status(500).json({error: 'Internal server error'});
-    }
-  });
-     
-
-
-  //   let result;
-  //   if (cursor) {
-  //     result = await pool.query<Job>(
-  //       `SELECT * FROM jobs
-  //      WHERE created_at < $1
-  //      ORDER BY created_at DESC
-  //      LIMIT $2`,
-  //       [cursor, limit + 1],
-  //     );
-  //   } else if (status) {
-  //     result = await pool.query<Job>(
-  //       `SELECT * FROM jobs
-  //       WHERE created_at < $1 AND status = $1
-  //       ORDER BY created_at DESC
-  //       LIMIT $2`,
-  //       [status, limit + 1],
-  //     );
-  //   } else {
-  //     result = await pool.query<Job>(
-  //       `SELECT * FROM jobs
-  //     ORDER BY created_at DESC
-  //     LIMIT $1`,
-  //       [limit + 1],
-  //     );
-  //   }
-
-  //   const hasMore = result.rows.length > limit;
-  //   const jobs = hasMore ? result.rows.slice(0, limit) : result.rows;
-  //   const nextCursor = hasMore ? jobs[jobs.length - 1]?.created_at : null;
-
-  //   return res.json({
-  //     jobs,
-  //     hasMore,
-  //     nextCursor,
-  //     count: jobs.length,
-  //   });
-  // } catch (err) {
-  //   console.error("Failed to fetch jobs:", err);
-  //   return res.status(500).json({ error: "Internal server error" });
-  // }
+    return res.json({
+      jobs,
+      hasMore,
+      nextCursor,
+      count: jobs.length,
+    });
+  } catch (err) {
+    console.error("Failed to fetch jobs:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // GET /jobs/:id - poll status jobs

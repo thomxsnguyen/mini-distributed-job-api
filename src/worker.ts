@@ -56,7 +56,7 @@ async function pickUpJob(): Promise<void> {
       // mark as SUCCESS
       await pool.query(
         `UPDATE jobs
-        SET status = 'success', updated_at = NOW()
+        SET status = 'SUCCESS', updated_at = NOW()
         WHERE id = $1`,
         [job.id],
       );
