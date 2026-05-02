@@ -1,5 +1,6 @@
 import { pool } from "./db/pool.js";
 import type { Job } from "./models/job.js";
+import { redis } from "./redis/client.js";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -18,31 +19,32 @@ async function processJob(job: Job): Promise<void> {
 }
 
 async function pickUpJob(): Promise<void> {
+  console.log("Waiting for jobs...");
+
+  const result = await redis.brpop("job_queue", 30);
+
+  if (!result) {
+    return;
+  }
+
+  const jobId = result[1];
+  console.log(`Picked up job ${jobId} from Redis`);
+
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-
     //grab one pending job and lock it so no other worker touches
     const result = await client.query<Job>(
       `UPDATE jobs
       SET status = 'PROCESSING', updated_at = NOW()
-      WHERE id = (
-        SELECT id FROM jobs
-        WHERE status = 'PENDING'
-        ORDER BY created_at ASC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
-        )
-    RETURNING *`, // returns the full updated row immediately
+      WHERE id = $1 and status = 'PENDING'
+      RETURNING *`,
+      [jobId],
     );
 
     if (result.rows.length === 0) {
       await client.query("ROLLBACK");
       return; // no jobs avaliable, there are no rows
     }
-
-    const job = result.rows[0];
-    await client.query("COMMIT");
 
     try {
       const job = result.rows[0];

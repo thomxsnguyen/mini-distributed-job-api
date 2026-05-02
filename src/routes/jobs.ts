@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { pool } from "../db/pool.js";
 import type { CreateJobInput, Job } from "../models/job.js";
+import { redis } from "../redis/client.js";
 
 const router = Router();
 
@@ -18,6 +19,9 @@ router.post("/", async (req: Request, res: Response) => {
       "INSERT INTO jobs (type, payload, max_attempts) VALUES ($1, $2, $3) RETURNING *",
       [type, payload, max_attempts || 3],
     );
+
+    await redis.lpush("job_queue", result.rows[0]!.id);
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error("Failed to create job:", error);
